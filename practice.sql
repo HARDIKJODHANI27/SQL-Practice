@@ -215,4 +215,23 @@ SELECT TOP 5 fname, lname, department, salary,
     END AS Salary_Category
 FROM employees WHERE department IN ('Tech', 'Sales', 'Marketing') AND hire_date > '2020-01-01' AND (fname LIKE 'A%' OR fname LIKE 'D%') AND salary BETWEEN 70000 AND 120000 ORDER BY salary DESC;
 
+-- Aggregate functions
+
+SELECT COUNT(id) FROM employees;
+SELECT MIN(salary) FROM employees;
+SELECT MAX(salary) FROM employees;
+SELECT AVG(salary) FROM employees;
+SELECT SUM(salary) FROM employees;
+
+-- GROUP BY Function
+
+SELECT department, COUNT(id) AS Employee_Count FROM employees GROUP BY department;
+SELECT city, COUNT(id) AS Employee_Count FROM employees GROUP BY city;
+SELECT department, AVG(salary) AS Average_Salary FROM employees GROUP BY department;
+SELECT department, SUM(salary) AS Total_Salary FROM employees GROUP BY department;
+
+SELECT department, city, COUNT(id) AS Employee_count
+FROM employees GROUP BY department, city
+ORDER BY department, city;
+
 
