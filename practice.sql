@@ -235,3 +235,36 @@ FROM employees GROUP BY department, city
 ORDER BY department, city;
 
 
+-- HAVING CLAUSE
+SELECT department, COUNT(id) AS Employee_count
+FROM employees
+GROUP BY department HAVING COUNT(id) > 2;
+
+SELECT job_title, AVG(salary) AS Average_Salary
+FROM employees
+GROUP BY job_title HAVING AVG(salary) > 90000;
+
+SELECT department, SUM(salary) AS Total_Salary
+FROM employees
+GROUP BY department HAVING SUM(salary) > 300000; 
+
+
+-- GROUP BY ROLLUP
+
+SELECT department, COUNT(id) AS Employee_count
+FROM employees GROUP BY ROLLUP(department);
+
+
+SELECT department, city, COUNT(id) AS Employee_count
+FROM employees GROUP BY ROLLUP(department, city);
+
+
+-- SUB QUERIES
+
+SELECT * FROM employees WHERE salary < (SELECT AVG(salary) FROM employees);
+
+SELECT fname, lname, department, city
+FROM employees WHERE department IN 
+(SELECT department FROM employees WHERE city = 'Mumbai');
+
+SELECT fname, lname, department FROM employees WHERE salary = (SELECT MAX(salary) FROM employees) GROUP BY department;
