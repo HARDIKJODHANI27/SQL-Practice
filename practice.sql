@@ -268,3 +268,136 @@ FROM employees WHERE department IN
 (SELECT department FROM employees WHERE city = 'Mumbai');
 
 SELECT fname, lname, department FROM employees WHERE salary = (SELECT MAX(salary) FROM employees) GROUP BY department;
+
+--- CORRELATED SUB QUERIES
+
+SELECT id, fname, lname, salary, department
+FROM employees e1
+WHERE salary = (SELECT MAX(salary) FROM employees e2 WHERE e2.department = e1.department);
+
+SELECT department FROM employees
+GROUP BY department
+ HAVING avg(salary) > 90000;
+ 
+-- STRING FUNCTIONS
+SELECT CONCAT(fname, ' ', lname) AS 'Full Name' FROM employees;
+SELECT CONCAT_WS(':', 'One', 'Two', 'Three')
+SELECT SUBSTRING('HELLO WORLD', 1, 5)
+SELECT REPLACE('Hey World', 'Hey', 'Hello')
+
+-- STRING EXERCISE
+SELECT CONCAT_WS(':', id, fname, lname, department, salary) AS Emp_Details FROM EMPLOYEES;
+
+SELECT CONCAT_WS(':', id, CONCAT(fname, ' ', lname), department, salary) AS Emp_Details FROM EMPLOYEES;
+
+
+-- ALTER FUNCTION
+ALTER TABLE employees
+ADD phone_number VARCHAR(15);
+
+ALTER TABLE employees
+DROP COLUMN phone_number;
+
+ALTER TABLE employees
+ADD CONSTRAINT default_dept DEFAULT 'Trainee'
+FOR department;
+
+EXEC sp_help 'employees';
+
+INSERT INTO employees (fname, lname, email, job_title, salary, city)
+VALUES ('Riya', 'Chopra',  'riyachopra@example.com', 'Fresher', 30000, 'Mumbai');
+
+ 
+SELECT * FROM employees;
+
+UPDATE employees
+SET id = 16
+WHERE id = 2002;
+
+-- CHECK CONSTRAINT
+
+ALTER TABLE employees
+ADD CONSTRAINT chk_pos_sal CHECK (salary > 0);
+
+INSERT INTO employees (fname, lname, email, job_title, salary, city)
+VALUES ('Paul', 'Verma',  'paulverma@example.com', 'Fresher', -30000, 'Mumbai');
+-- The above input fails and gives an error because of the check constraint on salary.
+
+ALTER TABLE employees
+ADD CONSTRAINT valid_email CHECK (email LIKE '%@%.%');
+
+
+INSERT INTO employees (fname, lname, email, job_title, salary, city)
+VALUES ('Paul', 'Verma',  'paulverma@example_com', 'Fresher', -30000, 'Mumbai');
+-- The above input fails and gives an error because of the check constraint on email.
+
+
+
+
+
+
+
+
+
+-- CREATING a COMPLETELY NEW SET OF TABLES AND ADDING NEW DATA FOR FURTHER LEARNING AND PRACTICE
+IF OBJECT_ID('Customers', 'U') IS NULL
+BEGIN
+    CREATE TABLE Customers (
+        customer_id INT IDENTITY(100,1) PRIMARY KEY,
+        customer_name VARCHAR(100) NOT NULL,
+        email VARCHAR(100) UNIQUE
+    );
+END;
+
+
+
+IF OBJECT_ID('Orders', 'U') IS NULL
+BEGIN
+    CREATE TABLE Orders (
+        order_id INT IDENTITY(500,1) PRIMARY KEY,
+        order_date DATE NOT NULL,
+        total_amount DECIMAL(10, 2),
+        customer_id INT,
+        FOREIGN KEY (customer_id) REFERENCES Customers(customer_id)
+    );
+END;
+
+
+INSERT INTO Customers (customer_name, email) VALUES 
+('Raju', 'raju@example.com'), 
+('Sham', 'sham@example.com'), 
+('Baburao', 'baburao@example.com');
+
+INSERT INTO Orders (order_date, total_amount, customer_id) VALUES 
+('2025-09-15', 1500.00, 100),
+('2025-09-28', 800.00, 101), 
+('2025-10-05', 2200.00, 100), 
+('2025-10-12', 500.00, 102),
+ ('2025-10-17', 1200.00, 101);
+
+
+SELECT * FROM Customers;
+SELECT * FROM Orders;
+
+
+-- There may be a customer who hasn't placed an order yet but has an account in the Customers table. We can add a new customer without an order.
+INSERT INTO customers (customer_name, email) VALUES 
+('Ramesh', 'ramesh@example.com');
+
+-- There may be an order where the customer refused to provide their details. We can add a new order without a customer_id.
+INSERT INTO Orders (order_date, total_amount) VALUES 
+('2025-10-20', 1800.00);   
+
+
+
+
+
+
+
+
+
+
+
+
+
+
