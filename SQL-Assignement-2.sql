@@ -175,7 +175,15 @@ INNER JOIN salaries s
     ON e.emp_id = s.emp_id;
 
 -- 14
-
+SELECT
+    emp_id
+FROM salaries
+GROUP BY emp_id
+HAVING COUNT(DISTINCT pay_month) =
+(
+    SELECT COUNT(DISTINCT pay_month)
+    FROM salaries
+);
 
 -- 15
 
@@ -267,7 +275,27 @@ WHERE s.salary >
 );
 
 -- 22
+SELECT
+    emp_id
+FROM salaries
+GROUP BY emp_id
+HAVING COUNT(DISTINCT pay_month) =
+(
+    SELECT COUNT(DISTINCT pay_month)
+    FROM salaries
+);
 -- 23
+SELECT
+    s.emp_id, e.emp_name
+FROM salaries s
+INNER JOIN employees2 e
+    ON s.emp_id = e.emp_id
+GROUP BY s.emp_id, e.emp_name
+HAVING COUNT(DISTINCT s.pay_month) =
+(
+    SELECT COUNT(DISTINCT pay_month)
+    FROM salaries
+);
 
 -- 24
 
