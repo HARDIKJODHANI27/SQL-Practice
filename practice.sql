@@ -417,3 +417,68 @@ customers c1
 RIGHT JOIN orders o1
 ON c1.customer_id = o1.customer_id
 GROUP BY customer_name;
+
+
+
+-- NEW TABLE AND DATA FOR FURTHER PRACTICE
+
+
+
+IF OBJECT_ID('COURSES', 'U') IS NULL
+BEGIN
+    CREATE TABLE COURSES(
+        course_id INT IDENTITY(1,1) PRIMARY KEY,
+        course_name VARCHAR(100) NOT NULL,
+        course_fee NUMERIC(10,2) NOT NULL
+    );
+END;
+
+INSERT INTO COURSES (course_name, course_fee) VALUES 
+('Physics', 500.00), 
+('Mathematics', 600.00), 
+('Biology', 700.00), 
+('Chemistry', 800.00);
+
+SELECT * FROM COURSES;
+
+
+IF OBJECT_ID('STUDENTS', 'U') IS NULL
+BEGIN
+    CREATE TABLE STUDENTS(
+        student_id INT IDENTITY(1,1) PRIMARY KEY,
+        student_name VARCHAR(100) NOT NULL
+    );
+END;
+
+INSERT INTO STUDENTS (student_name) VALUES 
+('Alice'), 
+('Bob'), 
+('Charlie'), 
+('David');
+
+SELECT * FROM STUDENTS;
+
+
+IF OBJECT_ID('ENROLLMENT', 'U') IS NULL
+BEGIN
+    CREATE TABLE ENROLLMENT(
+        enrollment_id INT IDENTITY(1,1) PRIMARY KEY,
+        student_id INT,
+        course_id INT,
+        enrollment_date DATE NOT NULL DEFAULT CONVERT(DATE, GETDATE()),
+        FOREIGN KEY (student_id) REFERENCES STUDENTS(student_id) ON DELETE CASCADE,
+        FOREIGN KEY (course_id) REFERENCES COURSES(course_id) ON DELETE CASCADE
+    );
+END;
+
+INSERT INTO enrollment(student_id, course_id, enrollment_date) VALUES
+(1, 1, '2025-09-01'), 
+(1, 2, '2025-09-05'), 
+(2, 2, '2025-09-10'), 
+(3, 3, '2025-09-15'), 
+(3, 2, '2025-09-15'), 
+(4, 4, '2025-09-20'),
+(4, 1, '2025-09-22');
+
+SELECT * FROM ENROLLMENT;
+
