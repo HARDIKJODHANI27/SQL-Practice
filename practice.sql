@@ -358,8 +358,8 @@ BEGIN
         order_date DATE NOT NULL,
         total_amount DECIMAL(10, 2),
         customer_id INT,
-        FOREIGN KEY (customer_id) REFERENCES Customers(customer_id)
-    );
+        FOREIGN KEY (customer_id) REFERENCES Customers(customer_id) ON DELETE CASCADE
+    ); 
 END;
 
 
@@ -389,15 +389,31 @@ INSERT INTO Orders (order_date, total_amount) VALUES
 ('2025-10-20', 1800.00);   
 
 
+DELETE FROM customers WHERE customer_id = 102;
+
+-- JOINS
+
+-- CROSS JOIN
+SELECT * FROM customers CROSS JOIN orders;
 
 
+-- INNER JOIN
+SELECT c1.customer_name, COUNT(o1.order_id) AS Total_Orders, SUM(o1.total_amount) AS Total_Amount FROM 
+customers c1
+INNER JOIN orders o1
+ON c1.customer_id = o1.customer_id
+GROUP BY customer_name;
 
 
+--LEFT & RIGHT JOIN
+SELECT c1.customer_name, COUNT(o1.order_id) AS Total_Orders, SUM(o1.total_amount) AS Total_Amount FROM 
+customers c1
+LEFT JOIN orders o1
+ON c1.customer_id = o1.customer_id
+GROUP BY customer_name;
 
-
-
-
-
-
-
-
+SELECT c1.customer_name, COUNT(o1.order_id) AS Total_Orders, SUM(o1.total_amount) AS Total_Amount FROM 
+customers c1
+RIGHT JOIN orders o1
+ON c1.customer_id = o1.customer_id
+GROUP BY customer_name;
