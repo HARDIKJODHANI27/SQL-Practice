@@ -1,16 +1,23 @@
 IF DB_ID('RetailAnalyticsDB') IS NULL
-    CREATE DATABASE RetailAnalyticsDB;
+    CREATE DATABASE RealAnalyticsDB;
 
 USE RealAnalyticsDB;
 
+
 -- Departments Table
-CREATE TABLE Departments (
-DepartmentID INT IDENTITY(1,1) PRIMARY KEY,
-DepartmentName VARCHAR(50) NOT NULL UNIQUE,
-Location VARCHAR(50)
-);
+IF OBJECT_ID('Departmenrs', 'U') IS NULL
+BEGIN
+    CREATE TABLE Departments (
+    DepartmentID INT IDENTITY(1,1) PRIMARY KEY,
+    DepartmentName VARCHAR(50) NOT NULL UNIQUE,
+    Location VARCHAR(50)
+    );
+END
+
 
 -- Employees Table
+IF OBJECT_ID('Employees', 'U') IS NULL
+BEGIN
 CREATE TABLE Employees (
 EmployeeID INT IDENTITY(1,1) PRIMARY KEY,
 FirstName VARCHAR(50) NOT NULL,
@@ -23,8 +30,11 @@ Salary DECIMAL(10,2) CHECK (Salary > 0),
 DepartmentID INT NULL REFERENCES Departments(DepartmentID),
 ManagerID INT NULL REFERENCES Employees(EmployeeID) -- self-referencing FK
 );
+END
 
 -- Customers Table
+IF OBJECT_ID('Customers', 'U') IS NULL
+BEGIN
 CREATE TABLE Customers (
 CustomerID INT IDENTITY(1,1) PRIMARY KEY,
 FirstName VARCHAR(50) NOT NULL,
@@ -35,16 +45,21 @@ State VARCHAR(50),
 Country VARCHAR(50),
 JoinDate DATE DEFAULT GETDATE()
 );
-
+END
 
 -- Categories Table
+IF OBJECT_ID('Categories', 'U') IS NULL
+BEGIN
 CREATE TABLE Categories (
 CategoryID INT IDENTITY(1,1) PRIMARY KEY,
 CategoryName VARCHAR(50) NOT NULL UNIQUE
 );
+END
 
 
 -- Suppliers Table
+IF OBJECT_ID('Suppliers', 'U') IS NULL
+BEGIN
 CREATE TABLE Suppliers (
 SupplierID INT IDENTITY(1,1) PRIMARY KEY,
 SupplierName VARCHAR(100) NOT NULL,
@@ -52,9 +67,12 @@ City VARCHAR(50),
 Country VARCHAR(50),
 ContactEmail VARCHAR(100)
 );
+END
 
 
 --Products Table
+IF OBJECT_ID('Products', 'U') IS NULL
+BEGIN
 CREATE TABLE Products (
 ProductID INT IDENTITY(1,1) PRIMARY KEY,
 ProductName VARCHAR(100) NOT NULL,
@@ -63,9 +81,12 @@ SupplierID INT NULL REFERENCES Suppliers(SupplierID),
 UnitPrice DECIMAL(10,2) NOT NULL CHECK (UnitPrice >= 0),
 StockQuantity INT DEFAULT 0
 );
+END
 
 
 -- Orders Table
+IF OBJECT_ID('Orders', 'U') IS NULL
+BEGIN
 CREATE TABLE Orders (
 OrderID INT IDENTITY(1,1) PRIMARY KEY,
 CustomerID INT NULL REFERENCES Customers(CustomerID),
@@ -74,9 +95,12 @@ OrderDate DATE NOT NULL,
 ShipDate DATE NULL,
 Status VARCHAR(20) DEFAULT 'Pending'
 );
+END
 
 
-
+-- Orders Details Table
+IF OBJECT_ID('OrderDetails', 'U') IS NULL
+BEGIN
 CREATE TABLE OrderDetails (
 OrderDetailID INT IDENTITY(1,1) PRIMARY KEY,
 OrderID INT NOT NULL REFERENCES Orders(OrderID),
@@ -85,9 +109,12 @@ Quantity INT NOT NULL CHECK (Quantity > 0),
 UnitPrice DECIMAL(10,2) NOT NULL,
 Discount DECIMAL(4,2) DEFAULT 0
 );
+END
 
 
 -- Payments Table
+IF OBJECT_ID('Payments', 'U') IS NULL
+BEGIN
 CREATE TABLE Payments (
  PaymentID INT IDENTITY(1,1) PRIMARY KEY,
  OrderID INT NOT NULL REFERENCES Orders(OrderID),
@@ -95,9 +122,12 @@ CREATE TABLE Payments (
  Amount DECIMAL(10,2) NOT NULL,
  PaymentMethod VARCHAR(20) NOT NULL
 );
+END
 
 
 -- Returns Table
+IF OBJECT_ID('Returns', 'U') IS NULL
+BEGIN
 CREATE TABLE Returns (
  ReturnID INT IDENTITY(1,1) PRIMARY KEY,
  OrderDetailID INT NOT NULL REFERENCES OrderDetails(OrderDetailID),
@@ -105,6 +135,7 @@ CREATE TABLE Returns (
  Reason VARCHAR(100),
  RefundAmount DECIMAL(10,2)
 );
+END
 
 
 
@@ -329,3 +360,49 @@ GROUP BY CategoryName;
 
 
 -- Question 11:
+SELECT o.customerID, p.amount, COUNT(od.orderID)
+FROM OrderDetails od
+JOIN Orders o on o.orderID = od.orderID
+JOIN Payments p on p.orderID = od.orderID
+GROUP BY p.amount, o.customerID
+HAVING p.amount > 3000 AND COUNT(od.orderID) > 2;
+
+-- Question 12:
+SELECT Count(od.OrderID)  AS Returned
+FROM [Returns] r
+JOIN OrderDetails od on od.OrderDetailID = r.OrderDetailID
+GROUP BY od.OrderID
+HAVING Count(od.OrderID) > 2
+
+-- Question 13:
+SELECT DATENAME(month, OrderDate), SUM(od.Quantity * od.UnitPrice) AS TOTAL_SALES
+FROM Orders o
+JOIN OrderDetails od on o.OrderID = od.OrderID
+GROUP BY od.Quantity, od.UnitPrice, o.OrderDate
+HAVING SUM(od.Quantity * od.UnitPrice) > 2000;
+
+-- Question 14:
+SELECT PaymentID, FirstName, LastName, OrderDate, PaymentDate, Amount, PaymentMethod
+FROM Payments p
+JOIN  Orders o on p.OrderID = o.OrderID
+JOIN Customers c on o.CustomerID = c.CustomerID
+
+-- Question 15:
+SELECT ProductName, OrderDate, ReturnDate, Reason
+FROM [Returns] r
+JOIN OrderDetails od on od.OrderDetailID = r.OrderDetailID
+JOIN Products p on p.ProductID = od.ProductID
+JOIN Orders o on o.OrderID = od.OrderID 
+
+-- Question 16:
+SELECT o.OrderID, p.PaymentID, p.PaymentMethod
+FROM Orders o
+LEFT JOIN Payments p on p.OrderID = o.OrderID
+WHERE [Status] = 'Delivered'
+
+-- Question 17:
+SELECT od.OrderDetailID,od.OrderID, r.ReturnID, r.Reason
+FROm OrderDetails od
+LEFT JOIN [Returns] r on r.OrderDetailID = od.OrderDetailID
+
+-- Question 18:
