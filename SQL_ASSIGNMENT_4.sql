@@ -406,3 +406,24 @@ FROm OrderDetails od
 LEFT JOIN [Returns] r on r.OrderDetailID = od.OrderDetailID
 
 -- Question 18:
+SELECT c.FirstName, c.LastName, p.Amount, p.PaymentMethod
+FROM Orders o
+JOIN Payments p on o.OrderID = p.OrderID
+RIGHT JOIN Customers c on c.CustomerID = o.CustomerID
+
+-- Questioin 19:
+SELECT c.CategoryName, p.PaymentMethod
+FROM Payments p
+JOIN OrderDetails od on p.OrderID = od.OrderID
+CROSS JOIN Categories c
+GROUP BY c.CategoryName, p.PaymentMethod;
+
+--Question 20:
+SELECT od.OrderDetailID, od.OrderID, r.ReturnID, r.Reason, r.RefundAmount
+FROM OrderDetails od
+FULL OUTER JOIN [Returns] r on r.OrderDetailID = od.OrderDetailID
+
+--Question 21:
+SELECT CONCAT_WS(':', PaymentID, PaymentMethod) AS pay_method FROM Payments
+
+--Question 22:
