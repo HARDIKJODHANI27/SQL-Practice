@@ -426,4 +426,1045 @@ FULL OUTER JOIN [Returns] r on r.OrderDetailID = od.OrderDetailID
 --Question 21:
 SELECT CONCAT_WS(':', PaymentID, PaymentMethod) AS pay_method FROM Payments
 
---Question 22:
+-- Q22
+SELECT
+    Email,
+    SUBSTRING(Email, CHARINDEX('@', Email) + 1, LEN(Email)) AS EmailDomain
+FROM Customers;
+
+-- Q23
+SELECT
+    ProductName,
+    REPLACE(ProductName, ' ', '_') AS ModifiedProductName
+FROM Products;
+
+-- Q24
+SELECT
+    Reason,
+    TRIM(Reason) AS TrimmedReason
+FROM Returns;
+
+-- Q25
+SELECT
+    p.PaymentID,
+    p.OrderID,
+    o.OrderDate,
+    p.PaymentDate,
+    DATEDIFF(DAY, o.OrderDate, p.PaymentDate) AS DaysAfterOrder
+FROM Payments p
+JOIN Orders o
+    ON p.OrderID = o.OrderID;
+
+-- Q26
+SELECT
+    PaymentID,
+    PaymentDate,
+    FORMAT(PaymentDate, 'dd-MMM-yyyy') AS FormattedPaymentDate
+FROM Payments;
+
+-- Q27
+SELECT
+    r.ReturnID,
+    r.OrderDetailID,
+    r.ReturnDate,
+    o.OrderDate,
+    DATEDIFF(DAY, o.OrderDate, r.ReturnDate) AS DaysToReturn,
+    r.Reason,
+    r.RefundAmount
+FROM Returns r
+JOIN OrderDetails od
+    ON r.OrderDetailID = od.OrderDetailID
+JOIN Orders o
+    ON od.OrderID = o.OrderID
+WHERE DATEDIFF(DAY, o.OrderDate, r.ReturnDate) <= 30;
+
+-- Q28
+WITH CustomerPayments AS
+(
+    SELECT
+        o.CustomerID,
+        SUM(p.Amount) AS TotalPayments
+    FROM Orders o
+    JOIN Payments p
+        ON o.OrderID = p.OrderID
+    GROUP BY o.CustomerID
+)
+SELECT
+    c.CustomerID,
+    c.FirstName,
+    c.LastName,
+    cp.TotalPayments
+FROM CustomerPayments cp
+JOIN Customers c
+    ON cp.CustomerID = c.CustomerID
+WHERE cp.TotalPayments > 5000;
+
+-- Q29
+WITH ProductRefunds AS
+(
+    SELECT
+        od.ProductID,
+        SUM(r.RefundAmount) AS TotalRefunded
+    FROM Returns r
+    JOIN OrderDetails od
+        ON r.OrderDetailID = od.OrderDetailID
+    GROUP BY od.ProductID
+)
+SELECT
+    p.ProductID,
+    p.ProductName,
+    COALESCE(pr.TotalRefunded, 0) AS TotalRefunded
+FROM Products p
+LEFT JOIN ProductRefunds pr
+    ON p.ProductID = pr.ProductID;
+
+-- Q30
+WITH MonthlyPayments AS
+(
+    SELECT
+        YEAR(PaymentDate) AS PaymentYear,
+        MONTH(PaymentDate) AS PaymentMonth,
+        SUM(Amount) AS TotalPayments
+    FROM Payments
+    GROUP BY YEAR(PaymentDate), MONTH(PaymentDate)
+)
+SELECT TOP 1
+    PaymentYear,
+    PaymentMonth,
+    TotalPayments
+FROM MonthlyPayments
+ORDER BY TotalPayments;
+
+-- Q31
+WITH CustomerRevenue AS
+(
+    SELECT
+        o.CustomerID,
+        SUM(od.Quantity * od.UnitPrice * (1 - od.Discount)) AS TotalRevenue
+    FROM Orders o
+    JOIN OrderDetails od
+        ON o.OrderID = od.OrderID
+    GROUP BY o.CustomerID
+),
+CustomerRefunds AS
+(
+    SELECT
+        o.CustomerID,
+        SUM(r.RefundAmount) AS TotalRefunds
+    FROM Orders o
+    JOIN OrderDetails od
+        ON o.OrderID = od.OrderID
+    JOIN Returns r
+        ON od.OrderDetailID = r.OrderDetailID
+    GROUP BY o.CustomerID
+)
+SELECT
+    c.CustomerID,
+    c.FirstName,
+    c.LastName,
+    COALESCE(cr.TotalRevenue, 0) AS TotalRevenue,
+    COALESCE(cf.TotalRefunds, 0) AS TotalRefunds,
+    COALESCE(cr.TotalRevenue, 0) - COALESCE(cf.TotalRefunds, 0) AS NetRevenue
+FROM Customers c
+LEFT JOIN CustomerRevenue cr
+    ON c.CustomerID = cr.CustomerID
+LEFT JOIN CustomerRefunds cf
+    ON c.CustomerID = cf.CustomerID;
+
+-- Q32
+WITH CustomerAOV AS
+(
+    SELECT
+        o.CustomerID,
+        AVG(OrderTotals.OrderValue) AS AverageOrderValue
+    FROM Orders o
+    JOIN
+    (
+        SELECT
+            OrderID,
+            SUM(Quantity * UnitPrice * (1 - Discount)) AS OrderValue
+        FROM OrderDetails
+        GROUP BY OrderID
+    ) OrderTotals
+        ON o.OrderID = OrderTotals.OrderID
+    GROUP BY o.CustomerID
+)
+SELECT
+    c.CustomerID,
+    c.FirstName,
+    c.LastName,
+    ca.AverageOrderValue
+FROM CustomerAOV ca
+JOIN Customers c
+    ON ca.CustomerID = c.CustomerID
+WHERE ca.AverageOrderValue >
+(
+    SELECT AVG(AverageOrderValue)
+    FROM CustomerAOV
+);
+
+-- Q33
+SELECT
+    o.CustomerID,
+    o.OrderID,
+    o.OrderDate,
+    SUM(od.Quantity * od.UnitPrice * (1 - od.Discount)) AS OrderRevenue,
+    SUM(
+        SUM(od.Quantity * od.UnitPrice * (1 - od.Discount))
+    ) OVER (
+        PARTITION BY o.CustomerID
+    ) AS CustomerTotalRevenue
+FROM Orders o
+JOIN OrderDetails od
+    ON o.OrderID = od.OrderID
+GROUP BY o.CustomerID, o.OrderID, o.OrderDate;
+
+-- Q34
+WITH RankedOrders AS
+(
+    SELECT
+        o.*,
+        ROW_NUMBER() OVER (
+            PARTITION BY CustomerID
+            ORDER BY OrderDate DESC, OrderID DESC
+        ) AS rn
+    FROM Orders o
+)
+SELECT *
+FROM RankedOrders
+WHERE rn = 1;
+
+-- Q35
+WITH PaymentTotals AS
+(
+    SELECT
+        PaymentMethod,
+        SUM(Amount) AS TotalCollected
+    FROM Payments
+    GROUP BY PaymentMethod
+)
+SELECT
+    PaymentMethod,
+    TotalCollected,
+    RANK() OVER (
+        ORDER BY TotalCollected DESC
+    ) AS PaymentMethodRank
+FROM PaymentTotals;
+
+-- Q36
+WITH CustomerPayments AS
+(
+    SELECT
+        p.PaymentID,
+        o.CustomerID,
+        p.PaymentDate,
+        p.Amount,
+        LAG(p.Amount) OVER (
+            PARTITION BY o.CustomerID
+            ORDER BY p.PaymentDate, p.PaymentID
+        ) AS PreviousAmount
+    FROM Payments p
+    JOIN Orders o
+        ON p.OrderID = o.OrderID
+)
+SELECT
+    PaymentID,
+    CustomerID,
+    PaymentDate,
+    Amount,
+    PreviousAmount,
+    CASE
+        WHEN PreviousAmount IS NULL THEN 'First Payment'
+        WHEN Amount > PreviousAmount THEN 'Increased'
+        WHEN Amount < PreviousAmount THEN 'Decreased'
+        ELSE 'No Change'
+    END AS PaymentTrend
+FROM CustomerPayments;
+
+-- Q37
+SELECT
+    ProductID,
+    ProductName,
+    CategoryID,
+    UnitPrice,
+    PERCENT_RANK() OVER (
+        PARTITION BY CategoryID
+        ORDER BY UnitPrice
+    ) AS PricePercentRank
+FROM Products;
+
+-- Q38
+SELECT
+    r.ReturnID,
+    od.ProductID,
+    p.ProductName,
+    r.ReturnDate,
+    r.Reason,
+    COUNT(*) OVER (
+        PARTITION BY od.ProductID
+    ) AS ProductReturnCount
+FROM Returns r
+JOIN OrderDetails od
+    ON r.OrderDetailID = od.OrderDetailID
+JOIN Products p
+    ON od.ProductID = p.ProductID;
+
+-- Q39
+CREATE TABLE Cart
+(
+    CartID INT IDENTITY(1,1) PRIMARY KEY,
+    CustomerID INT NOT NULL,
+    ProductID INT NOT NULL,
+    DateAdded DATE NOT NULL DEFAULT GETDATE(),
+    Quantity INT NOT NULL DEFAULT 1
+        CHECK (Quantity > 0),
+    FOREIGN KEY (CustomerID) REFERENCES Customers(CustomerID),
+    FOREIGN KEY (ProductID) REFERENCES Products(ProductID)
+);
+
+INSERT INTO Cart (CustomerID, ProductID, Quantity)
+VALUES
+(1, 1, 2),
+(2, 5, 1),
+(3, 12, 3);
+
+-- Q40
+WITH RankedPayments AS
+(
+    SELECT
+        p.PaymentID,
+        o.CustomerID,
+        p.OrderID,
+        p.PaymentDate,
+        p.Amount,
+        ROW_NUMBER() OVER (
+            PARTITION BY o.CustomerID
+            ORDER BY p.Amount DESC
+        ) AS rn
+    FROM Payments p
+    JOIN Orders o
+        ON p.OrderID = o.OrderID
+)
+SELECT
+    CustomerID,
+    PaymentID,
+    OrderID,
+    PaymentDate,
+    Amount
+FROM RankedPayments
+WHERE rn <= 2;
+
+-- Q41
+SELECT
+    od.ProductID,
+    p.ProductName,
+    COUNT(*) AS ReturnCount
+FROM Returns r
+JOIN OrderDetails od
+    ON r.OrderDetailID = od.OrderDetailID
+JOIN Products p
+    ON od.ProductID = p.ProductID
+GROUP BY od.ProductID, p.ProductName
+HAVING COUNT(*) >
+(
+    SELECT AVG(ReturnCount * 1.0)
+    FROM
+    (
+        SELECT
+            od2.ProductID,
+            COUNT(*) AS ReturnCount
+        FROM Returns r2
+        JOIN OrderDetails od2
+            ON r2.OrderDetailID = od2.OrderDetailID
+        GROUP BY od2.ProductID
+    ) x
+);
+
+-- Q42
+WITH Revenue AS
+(
+    SELECT
+        o.CustomerID,
+        SUM(od.Quantity * od.UnitPrice * (1 - od.Discount)) AS TotalRevenue
+    FROM Orders o
+    JOIN OrderDetails od
+        ON o.OrderID = od.OrderID
+    GROUP BY o.CustomerID
+),
+Refunds AS
+(
+    SELECT
+        o.CustomerID,
+        SUM(r.RefundAmount) AS TotalRefunds
+    FROM Orders o
+    JOIN OrderDetails od
+        ON o.OrderID = od.OrderID
+    JOIN Returns r
+        ON od.OrderDetailID = r.OrderDetailID
+    GROUP BY o.CustomerID
+)
+SELECT
+    c.CustomerID,
+    c.FirstName,
+    c.LastName,
+    COALESCE(rev.TotalRevenue, 0) AS TotalRevenue,
+    COALESCE(ref.TotalRefunds, 0) AS TotalRefunds,
+    COALESCE(rev.TotalRevenue, 0) - COALESCE(ref.TotalRefunds, 0) AS NetRevenue
+FROM Customers c
+LEFT JOIN Revenue rev
+    ON c.CustomerID = rev.CustomerID
+LEFT JOIN Refunds ref
+    ON c.CustomerID = ref.CustomerID
+WHERE COALESCE(rev.TotalRevenue, 0) - COALESCE(ref.TotalRefunds, 0) <= 0;
+
+-- Q43
+SELECT
+    ReturnID,
+    ReturnDate,
+    RefundAmount,
+    SUM(RefundAmount) OVER (
+        ORDER BY ReturnDate, ReturnID
+        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS RunningRefundTotal
+FROM Returns;
+
+-- Q44
+WITH PreviousOrders AS
+(
+    SELECT
+        OrderID,
+        CustomerID,
+        OrderDate,
+        LAG(OrderDate) OVER (
+            PARTITION BY CustomerID
+            ORDER BY OrderDate, OrderID
+        ) AS PreviousOrderDate
+    FROM Orders
+)
+SELECT
+    OrderID,
+    CustomerID,
+    OrderDate,
+    PreviousOrderDate,
+    DATEDIFF(DAY, PreviousOrderDate, OrderDate) AS DaysSincePreviousOrder,
+    CASE
+        WHEN PreviousOrderDate IS NULL THEN 'First Order'
+        WHEN DATEDIFF(DAY, PreviousOrderDate, OrderDate) > 60
+            THEN 'Inactive Period'
+        ELSE 'Active Period'
+    END AS CustomerActivity
+FROM PreviousOrders;
+
+-- Q45
+WITH DateSpine AS
+(
+    SELECT MIN(OrderDate) AS CalendarDate
+    FROM Orders
+
+    UNION ALL
+
+    SELECT DATEADD(DAY, 1, CalendarDate)
+    FROM DateSpine
+    WHERE CalendarDate < (SELECT MAX(OrderDate) FROM Orders)
+),
+DailyOrders AS
+(
+    SELECT
+        OrderDate,
+        COUNT(*) AS OrderCount
+    FROM Orders
+    GROUP BY OrderDate
+)
+SELECT
+    ds.CalendarDate,
+    COALESCE(do.OrderCount, 0) AS OrderCount
+FROM DateSpine ds
+LEFT JOIN DailyOrders do
+    ON ds.CalendarDate = do.OrderDate
+ORDER BY ds.CalendarDate
+OPTION (MAXRECURSION 0);
+
+-- Q46
+WITH ProductMethodRevenue AS
+(
+    SELECT
+        p.PaymentMethod,
+        od.ProductID,
+        pr.ProductName,
+        SUM(od.Quantity * od.UnitPrice * (1 - od.Discount)) AS Revenue
+    FROM Payments p
+    JOIN OrderDetails od
+        ON p.OrderID = od.OrderID
+    JOIN Products pr
+        ON od.ProductID = pr.ProductID
+    GROUP BY p.PaymentMethod, od.ProductID, pr.ProductName
+),
+RankedProducts AS
+(
+    SELECT
+        *,
+        RANK() OVER (
+            PARTITION BY PaymentMethod
+            ORDER BY Revenue DESC
+        ) AS ProductRank
+    FROM ProductMethodRevenue
+)
+SELECT *
+FROM RankedProducts
+WHERE ProductRank = 1;
+
+-- Q47
+WITH CategoryRevenue AS
+(
+    SELECT
+        c.CategoryID,
+        c.CategoryName,
+        SUM(od.Quantity * od.UnitPrice * (1 - od.Discount)) AS Revenue
+    FROM Categories c
+    JOIN Products p
+        ON c.CategoryID = p.CategoryID
+    JOIN OrderDetails od
+        ON p.ProductID = od.ProductID
+    GROUP BY c.CategoryID, c.CategoryName
+)
+SELECT
+    CategoryID,
+    CategoryName,
+    Revenue,
+    ROUND(
+        Revenue * 100.0 / SUM(Revenue) OVER (),
+        2
+    ) AS RevenuePercentage
+FROM CategoryRevenue;
+
+-- Q48
+WITH ProductPrices AS
+(
+    SELECT
+        ProductID,
+        ProductName,
+        UnitPrice,
+        CUME_DIST() OVER (
+            ORDER BY UnitPrice DESC
+        ) AS PriceCumeDist
+    FROM Products
+)
+SELECT
+    ProductID,
+    ProductName,
+    UnitPrice,
+    PriceCumeDist
+FROM ProductPrices
+WHERE PriceCumeDist <= 0.10;
+
+-- Q49
+WITH CustomerMonths AS
+(
+    SELECT
+        CustomerID,
+        YEAR(OrderDate) AS OrderYear,
+        MONTH(OrderDate) AS OrderMonth
+    FROM Orders
+    GROUP BY CustomerID, YEAR(OrderDate), MONTH(OrderDate)
+)
+SELECT
+    CustomerID,
+    COUNT(*) AS DifferentMonths
+FROM CustomerMonths
+GROUP BY CustomerID
+HAVING COUNT(*) >= 3;
+
+-- Q50
+WITH MonthlyRevenue AS
+(
+    SELECT
+        YEAR(o.OrderDate) AS OrderYear,
+        MONTH(o.OrderDate) AS OrderMonth,
+        SUM(od.Quantity * od.UnitPrice * (1 - od.Discount)) AS Revenue
+    FROM Orders o
+    JOIN OrderDetails od
+        ON o.OrderID = od.OrderID
+    GROUP BY YEAR(o.OrderDate), MONTH(o.OrderDate)
+),
+RevenueWithPrevious AS
+(
+    SELECT
+        *,
+        LAG(Revenue) OVER (
+            ORDER BY OrderYear, OrderMonth
+        ) AS PreviousMonthRevenue
+    FROM MonthlyRevenue
+)
+SELECT
+    OrderYear,
+    OrderMonth,
+    Revenue,
+    PreviousMonthRevenue,
+    ROUND(
+        (Revenue - PreviousMonthRevenue) * 100.0
+        / NULLIF(PreviousMonthRevenue, 0),
+        2
+    ) AS MoMGrowthPercentage
+FROM RevenueWithPrevious
+ORDER BY OrderYear, OrderMonth;
+
+-- Q51
+WITH MonthlyRevenue AS
+(
+    SELECT
+        DATEFROMPARTS(
+            YEAR(o.OrderDate),
+            MONTH(o.OrderDate),
+            1
+        ) AS RevenueMonth,
+        SUM(od.Quantity * od.UnitPrice * (1 - od.Discount)) AS Revenue
+    FROM Orders o
+    JOIN OrderDetails od
+        ON o.OrderID = od.OrderID
+    GROUP BY YEAR(o.OrderDate), MONTH(o.OrderDate)
+),
+SlidingRevenue AS
+(
+    SELECT
+        RevenueMonth,
+        Revenue,
+        SUM(Revenue) OVER (
+            ORDER BY RevenueMonth
+            ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
+        ) AS ThreeMonthRevenue
+    FROM MonthlyRevenue
+)
+SELECT TOP 1
+    RevenueMonth,
+    ThreeMonthRevenue
+FROM SlidingRevenue
+ORDER BY ThreeMonthRevenue DESC;
+
+-- Q52
+WITH CategorySales AS
+(
+    SELECT
+        p.CategoryID,
+        SUM(od.Quantity) AS TotalUnitsSold
+    FROM Products p
+    JOIN OrderDetails od
+        ON p.ProductID = od.ProductID
+    GROUP BY p.CategoryID
+),
+CategoryReturns AS
+(
+    SELECT
+        p.CategoryID,
+        SUM(od.Quantity) AS ReturnedUnits
+    FROM Returns r
+    JOIN OrderDetails od
+        ON r.OrderDetailID = od.OrderDetailID
+    JOIN Products p
+        ON od.ProductID = p.ProductID
+    GROUP BY p.CategoryID
+)
+SELECT
+    c.CategoryName,
+    cs.TotalUnitsSold,
+    COALESCE(cr.ReturnedUnits, 0) AS ReturnedUnits,
+    ROUND(
+        COALESCE(cr.ReturnedUnits, 0) * 100.0
+        / NULLIF(cs.TotalUnitsSold, 0),
+        2
+    ) AS ReturnRate
+FROM Categories c
+JOIN CategorySales cs
+    ON c.CategoryID = cs.CategoryID
+LEFT JOIN CategoryReturns cr
+    ON c.CategoryID = cr.CategoryID
+WHERE COALESCE(cr.ReturnedUnits, 0) * 100.0
+    / NULLIF(cs.TotalUnitsSold, 0) > 10;
+
+-- Q53
+WITH RankedReturns AS
+(
+    SELECT
+        r.ReturnID,
+        od.ProductID,
+        p.ProductName,
+        r.ReturnDate,
+        r.Reason,
+        r.RefundAmount,
+        ROW_NUMBER() OVER (
+            PARTITION BY od.ProductID
+            ORDER BY r.ReturnDate, r.ReturnID
+        ) AS ReturnNumber
+    FROM Returns r
+    JOIN OrderDetails od
+        ON r.OrderDetailID = od.OrderDetailID
+    JOIN Products p
+        ON od.ProductID = p.ProductID
+)
+SELECT
+    ReturnID,
+    ProductID,
+    ProductName,
+    ReturnDate,
+    Reason,
+    RefundAmount,
+    CASE
+        WHEN ReturnNumber = 1 THEN 'First Return'
+        ELSE 'Repeat Return'
+    END AS ReturnStatus
+FROM RankedReturns;
+
+-- Q54
+SELECT
+    o1.CustomerID,
+    o1.OrderID AS Order1,
+    o1.OrderDate AS Order1Date,
+    o2.OrderID AS Order2,
+    o2.OrderDate AS Order2Date,
+    DATEDIFF(DAY, o1.OrderDate, o2.OrderDate) AS DaysBetween
+FROM Orders o1
+JOIN Orders o2
+    ON o1.CustomerID = o2.CustomerID
+    AND o1.OrderID < o2.OrderID
+WHERE DATEDIFF(DAY, o1.OrderDate, o2.OrderDate) <= 7;
+
+-- Q55
+WITH OrderTotals AS
+(
+    SELECT
+        OrderID,
+        SUM(Quantity * UnitPrice * (1 - Discount)) AS OrderTotal
+    FROM OrderDetails
+    GROUP BY OrderID
+),
+PaymentTotals AS
+(
+    SELECT
+        OrderID,
+        SUM(Amount) AS PaidAmount
+    FROM Payments
+    GROUP BY OrderID
+)
+SELECT
+    COALESCE(ot.OrderID, pt.OrderID) AS OrderID,
+    COALESCE(ot.OrderTotal, 0) AS OrderTotal,
+    COALESCE(pt.PaidAmount, 0) AS PaidAmount,
+    COALESCE(pt.PaidAmount, 0) - COALESCE(ot.OrderTotal, 0) AS Difference,
+    CASE
+        WHEN COALESCE(ot.OrderTotal, 0) = COALESCE(pt.PaidAmount, 0)
+            THEN 'Matched'
+        ELSE 'Mismatch'
+    END AS ReconciliationStatus
+FROM OrderTotals ot
+FULL OUTER JOIN PaymentTotals pt
+    ON ot.OrderID = pt.OrderID
+ORDER BY OrderID;
+
+-- Q56
+WITH CustomerSpend AS
+(
+    SELECT
+        c.CustomerID,
+        c.FirstName,
+        c.LastName,
+        COALESCE(
+            SUM(od.Quantity * od.UnitPrice * (1 - od.Discount)),
+            0
+        ) AS TotalSpend
+    FROM Customers c
+    LEFT JOIN Orders o
+        ON c.CustomerID = o.CustomerID
+    LEFT JOIN OrderDetails od
+        ON o.OrderID = od.OrderID
+    GROUP BY c.CustomerID, c.FirstName, c.LastName
+),
+TieredCustomers AS
+(
+    SELECT
+        *,
+        NTILE(3) OVER (
+            ORDER BY TotalSpend DESC
+        ) AS TierNumber
+    FROM CustomerSpend
+)
+SELECT
+    CustomerID,
+    FirstName,
+    LastName,
+    TotalSpend,
+    CASE TierNumber
+        WHEN 1 THEN 'Gold'
+        WHEN 2 THEN 'Silver'
+        WHEN 3 THEN 'Bronze'
+    END AS CustomerTier
+FROM TieredCustomers;
+
+-- Q57
+WITH OrderValues AS
+(
+    SELECT
+        o.OrderID,
+        o.OrderDate,
+        DATEPART(WEEKDAY, o.OrderDate) AS DayNumber,
+        DATENAME(WEEKDAY, o.OrderDate) AS DayName,
+        SUM(od.Quantity * od.UnitPrice * (1 - od.Discount)) AS OrderValue
+    FROM Orders o
+    JOIN OrderDetails od
+        ON o.OrderID = od.OrderID
+    GROUP BY o.OrderID, o.OrderDate
+),
+DayAverages AS
+(
+    SELECT
+        DayNumber,
+        DayName,
+        AVG(OrderValue) AS AverageOrderValue
+    FROM OrderValues
+    GROUP BY DayNumber, DayName
+)
+SELECT
+    DayNumber,
+    DayName,
+    AverageOrderValue
+FROM DayAverages
+WHERE AverageOrderValue =
+(
+    SELECT MAX(AverageOrderValue)
+    FROM DayAverages
+);
+
+-- Q58
+WITH ProductMonthlyRevenue AS
+(
+    SELECT
+        YEAR(o.OrderDate) AS OrderYear,
+        MONTH(o.OrderDate) AS OrderMonth,
+        od.ProductID,
+        SUM(od.Quantity * od.UnitPrice * (1 - od.Discount)) AS Revenue
+    FROM Orders o
+    JOIN OrderDetails od
+        ON o.OrderID = od.OrderID
+    WHERE YEAR(o.OrderDate) = 2023
+        AND MONTH(o.OrderDate) IN (1, 4)
+    GROUP BY
+        YEAR(o.OrderDate),
+        MONTH(o.OrderDate),
+        od.ProductID
+),
+JanuaryRanks AS
+(
+    SELECT
+        ProductID,
+        Revenue,
+        RANK() OVER (
+            ORDER BY Revenue DESC
+        ) AS JanRank
+    FROM ProductMonthlyRevenue
+    WHERE OrderMonth = 1
+),
+AprilRanks AS
+(
+    SELECT
+        ProductID,
+        Revenue,
+        RANK() OVER (
+            ORDER BY Revenue DESC
+        ) AS AprRank
+    FROM ProductMonthlyRevenue
+    WHERE OrderMonth = 4
+)
+SELECT
+    p.ProductID,
+    p.ProductName,
+    jr.Revenue AS JanuaryRevenue,
+    jr.JanRank,
+    ar.Revenue AS AprilRevenue,
+    ar.AprRank,
+    COALESCE(jr.JanRank, 0) - COALESCE(ar.AprRank, 0) AS RankChange
+FROM Products p
+LEFT JOIN JanuaryRanks jr
+    ON p.ProductID = jr.ProductID
+LEFT JOIN AprilRanks ar
+    ON p.ProductID = ar.ProductID
+WHERE jr.ProductID IS NOT NULL
+    OR ar.ProductID IS NOT NULL;
+
+-- Q59
+WITH SupplierRevenue AS
+(
+    SELECT
+        s.SupplierID,
+        s.SupplierName,
+        SUM(od.Quantity * od.UnitPrice * (1 - od.Discount)) AS TotalRevenue
+    FROM Suppliers s
+    JOIN Products p
+        ON s.SupplierID = p.SupplierID
+    JOIN OrderDetails od
+        ON p.ProductID = od.ProductID
+    GROUP BY s.SupplierID, s.SupplierName
+)
+SELECT
+    SupplierID,
+    SupplierName,
+    TotalRevenue
+FROM SupplierRevenue
+WHERE TotalRevenue > 5000;
+
+-- Q60
+SELECT
+    o.OrderID,
+    STRING_AGG(p.ProductName, ', ') AS Products
+FROM Orders o
+JOIN OrderDetails od
+    ON o.OrderID = od.OrderID
+JOIN Products p
+    ON od.ProductID = p.ProductID
+GROUP BY o.OrderID;
+
+-- Q61
+WITH PaymentDuplicates AS
+(
+    SELECT
+        p.PaymentID,
+        o.CustomerID,
+        p.PaymentDate,
+        p.Amount,
+        COUNT(*) OVER (
+            PARTITION BY o.CustomerID, p.PaymentDate, p.Amount
+        ) AS DuplicateCount
+    FROM Payments p
+    JOIN Orders o
+        ON p.OrderID = o.OrderID
+)
+SELECT
+    PaymentID,
+    CustomerID,
+    PaymentDate,
+    Amount,
+    DuplicateCount,
+    CASE
+        WHEN DuplicateCount > 1 THEN 'Potential Duplicate'
+        ELSE 'Normal'
+    END AS PaymentStatus
+FROM PaymentDuplicates
+WHERE DuplicateCount > 1;
+
+-- Q62
+CREATE TABLE OrderStatusHistory
+(
+    HistoryID INT IDENTITY(1,1) PRIMARY KEY,
+    OrderID INT NOT NULL,
+    OldStatus VARCHAR(20),
+    NewStatus VARCHAR(20),
+    ChangedDate DATE NOT NULL,
+    FOREIGN KEY (OrderID) REFERENCES Orders(OrderID)
+);
+
+INSERT INTO OrderStatusHistory
+    (OrderID, OldStatus, NewStatus, ChangedDate)
+VALUES
+(1, 'Pending', 'Processing', '2023-01-05'),
+(1, 'Processing', 'Shipped', '2023-01-06'),
+(1, 'Shipped', 'Delivered', '2023-01-08'),
+(2, 'Pending', 'Processing', '2023-01-12');
+
+WITH StatusChanges AS
+(
+    SELECT
+        HistoryID,
+        OrderID,
+        OldStatus,
+        NewStatus,
+        ChangedDate,
+        LAG(ChangedDate) OVER (
+            PARTITION BY OrderID
+            ORDER BY ChangedDate, HistoryID
+        ) AS PreviousChangedDate
+    FROM OrderStatusHistory
+)
+SELECT
+    HistoryID,
+    OrderID,
+    OldStatus,
+    NewStatus,
+    ChangedDate,
+    DATEDIFF(
+        DAY,
+        PreviousChangedDate,
+        ChangedDate
+    ) AS DaysInPreviousStatus
+FROM StatusChanges
+ORDER BY OrderID, ChangedDate;
+
+-- Q63
+WITH CustomerSpend AS
+(
+    SELECT
+        c.CustomerID,
+        c.FirstName,
+        c.LastName,
+        c.State,
+        COALESCE(
+            SUM(od.Quantity * od.UnitPrice * (1 - od.Discount)),
+            0
+        ) AS TotalSpend
+    FROM Customers c
+    LEFT JOIN Orders o
+        ON c.CustomerID = o.CustomerID
+    LEFT JOIN OrderDetails od
+        ON o.OrderID = od.OrderID
+    GROUP BY
+        c.CustomerID,
+        c.FirstName,
+        c.LastName,
+        c.State
+)
+SELECT
+    CustomerID,
+    FirstName,
+    LastName,
+    State,
+    TotalSpend,
+    RANK() OVER (
+        ORDER BY TotalSpend DESC
+    ) AS OverallRank,
+    RANK() OVER (
+        PARTITION BY State
+        ORDER BY TotalSpend DESC
+    ) AS StateRank
+FROM CustomerSpend
+ORDER BY OverallRank;
+
+-- Q64
+WITH CategoryQuarterRevenue AS
+(
+    SELECT
+        c.CategoryID,
+        c.CategoryName,
+        DATEPART(QUARTER, o.OrderDate) AS QuarterNumber,
+        SUM(
+            od.Quantity *
+            od.UnitPrice *
+            (1 - od.Discount)
+        ) AS Revenue
+    FROM Categories c
+    JOIN Products p
+        ON c.CategoryID = p.CategoryID
+    JOIN OrderDetails od
+        ON p.ProductID = od.ProductID
+    JOIN Orders o
+        ON od.OrderID = o.OrderID
+    GROUP BY
+        c.CategoryID,
+        c.CategoryName,
+        DATEPART(QUARTER, o.OrderDate)
+)
+SELECT
+    CategoryID,
+    CategoryName,
+    COALESCE(SUM(CASE WHEN QuarterNumber = 1 THEN Revenue END), 0) AS Q1,
+    COALESCE(SUM(CASE WHEN QuarterNumber = 2 THEN Revenue END), 0) AS Q2,
+    COALESCE(SUM(CASE WHEN QuarterNumber = 3 THEN Revenue END), 0) AS Q3,
+    COALESCE(SUM(CASE WHEN QuarterNumber = 4 THEN Revenue END), 0) AS Q4
+FROM CategoryQuarterRevenue
+GROUP BY CategoryID, CategoryName
+ORDER BY CategoryID;
